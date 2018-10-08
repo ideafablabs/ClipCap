@@ -16,15 +16,18 @@
 //==============================================================================
 /**
 */
-class NewProjectAudioProcessor  : public AudioProcessor
+class ClipCapAudioProcessor  : public AudioProcessor
 {
 public:
     //==============================================================================
-    NewProjectAudioProcessor();
-    ~NewProjectAudioProcessor();
+    ClipCapAudioProcessor();
+    ~ClipCapAudioProcessor();
 
     //==============================================================================
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
+
+	void reset();
+
     void releaseResources() override;
 
    #ifndef JucePlugin_PreferredChannelConfigurations
@@ -56,7 +59,24 @@ public:
     void getStateInformation (MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+	float SinglePoleCoeff(float cutoff, double sampleRate);
+	float getEnvSlow() { return m_envSlow; }
+	float getEnvFast() { return m_envFast; }
+
 private:
+
+	double m_sampleRate;
+	AudioBuffer<float> recordBufferFloat;
+	uint32 m_recordIndex;
+
+	float m_envSlow;
+	float m_envFast;
+	float m_envSlowCoeff;
+	float m_envFastCoeff;
+	uint32 m_sampleStartIndex;
+
+
+
     //==============================================================================
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NewProjectAudioProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ClipCapAudioProcessor)
 };

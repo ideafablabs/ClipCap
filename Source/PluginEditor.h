@@ -17,20 +17,26 @@
 //==============================================================================
 /**
 */
-class NewProjectAudioProcessorEditor  : public AudioProcessorEditor
+class ClipCapEditor  : public AudioProcessorEditor, private Timer
 {
 public:
-    NewProjectAudioProcessorEditor (NewProjectAudioProcessor&);
-    ~NewProjectAudioProcessorEditor();
+    ClipCapEditor (ClipCapAudioProcessor&);
+    ~ClipCapEditor();
 
     //==============================================================================
     void paint (Graphics&) override;
     void resized() override;
+	void timerCallback() override;
+
+	float convertMeterScale(float value);
 
 private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
-    NewProjectAudioProcessor& processor;
+	class DisplaySlider;
+	ScopedPointer<DisplaySlider> m_envSlowSlider, m_envFastSlider;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NewProjectAudioProcessorEditor)
+    ClipCapAudioProcessor& processor;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ClipCapEditor)
 };
