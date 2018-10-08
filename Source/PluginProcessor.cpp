@@ -125,6 +125,8 @@ void ClipCapAudioProcessor::reset()
 	m_envSlow = 0.0;
 	m_envFastCoeff = SinglePoleCoeff(10, m_sampleRate);
 	m_envSlowCoeff = SinglePoleCoeff(0.5, m_sampleRate);
+	m_envRecord = 0.0;
+	m_envRecordCoeff = SinglePoleCoeff(0.5, m_sampleRate);
 }
 
 void ClipCapAudioProcessor::releaseResources()
@@ -184,6 +186,11 @@ void ClipCapAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
 		float rms = sqrtf(sample * sample);
 		m_envFast = (m_envFast * m_envFastCoeff) + (rms * (1.0 - m_envFastCoeff));
 		m_envSlow = (m_envSlow * m_envSlowCoeff) + (rms * (1.0 - m_envSlowCoeff));
+
+		if ((m_envSlow > 0.01) && (m_envFast / m_envSlow > 1.12))
+			m_envRecord = 1.0;  // recent triggers reset to 1.0
+		else
+			m_envRecord *= m_envRecordCoeff;  // decay when not triggered
 
 		if (++m_recordIndex > recordBufferFloat.getNumSamples())
 			m_recordIndex = 0;

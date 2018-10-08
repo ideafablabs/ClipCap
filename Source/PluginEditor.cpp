@@ -37,6 +37,9 @@ ClipCapEditor::ClipCapEditor (ClipCapAudioProcessor& p)
 	addAndMakeVisible(m_envFastSlider = new DisplaySlider(p));
 	m_envFastSlider->setSliderStyle(Slider::LinearVertical);
 	m_envFastSlider->setTextBoxStyle(Slider::NoTextBox, true, 0, 0);
+	addAndMakeVisible(m_recordSlider = new DisplaySlider(p));
+	m_recordSlider->setSliderStyle(Slider::LinearVertical);
+	m_recordSlider->setTextBoxStyle(Slider::NoTextBox, true, 0, 0);
 
 	setSize(200, 200);
 
@@ -65,8 +68,9 @@ void ClipCapEditor::resized()
 
 	//Rectangle<int> sliderArea(r.removeFromTop(60));
 	//m_displaySlider->setBounds(sliderArea.removeFromLeft(jmin(180, sliderArea.getWidth())));
-	m_envSlowSlider->setBounds(r.removeFromLeft(jmin(80, r.getWidth())));
-	m_envFastSlider->setBounds(r.removeFromLeft(jmin(80, r.getWidth())));
+	m_envSlowSlider->setBounds(r.removeFromLeft(jmin(60, r.getWidth())));
+	m_envFastSlider->setBounds(r.removeFromLeft(jmin(60, r.getWidth())));
+	m_recordSlider->setBounds(r.removeFromLeft(jmin(60, r.getWidth())));
 
 }
 
@@ -84,4 +88,5 @@ void ClipCapEditor::timerCallback()
 {
 	m_envSlowSlider->setValue(convertMeterScale(processor.getEnvSlow()));
 	m_envFastSlider->setValue(convertMeterScale(processor.getEnvFast()));
+	m_recordSlider->setValue(convertMeterScale(processor.getEnvRecord()));
 }

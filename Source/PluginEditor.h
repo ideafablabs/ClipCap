@@ -34,7 +34,7 @@ private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
 	class DisplaySlider;
-	ScopedPointer<DisplaySlider> m_envSlowSlider, m_envFastSlider;
+	ScopedPointer<DisplaySlider> m_envSlowSlider, m_envFastSlider, m_recordSlider;
 
     ClipCapAudioProcessor& processor;
 

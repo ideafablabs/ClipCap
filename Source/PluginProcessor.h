@@ -62,6 +62,7 @@ public:
 	float SinglePoleCoeff(float cutoff, double sampleRate);
 	float getEnvSlow() { return m_envSlow; }
 	float getEnvFast() { return m_envFast; }
+	float getEnvRecord() { return m_envRecord; }
 
 private:
 
@@ -73,6 +74,8 @@ private:
 	float m_envFast;
 	float m_envSlowCoeff;
 	float m_envFastCoeff;
+	float m_envRecord;
+	float m_envRecordCoeff;
 	uint32 m_sampleStartIndex;
 
 
