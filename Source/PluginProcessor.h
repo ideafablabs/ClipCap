@@ -63,12 +63,18 @@ public:
 	float getEnvSlow() { return m_envSlow; }
 	float getEnvFast() { return m_envFast; }
 	float getEnvRecord() { return m_envRecord; }
+	int32 getSampleStartIndex() { return m_sampleStartIndex; }
 
 private:
 
 	double m_sampleRate;
 	AudioBuffer<float> recordBufferFloat;
-	uint32 m_recordIndex;
+	int m_recordIndex;
+
+#define NUM_SAMPLE_BUFFERS 128
+	AudioBuffer<float> m_sampleBuffers[NUM_SAMPLE_BUFFERS];
+	int m_sampleBufferIndex;
+
 
 	float m_envSlow;
 	float m_envFast;
@@ -76,7 +82,7 @@ private:
 	float m_envFastCoeff;
 	float m_envRecord;
 	float m_envRecordCoeff;
-	uint32 m_sampleStartIndex;
+	int m_sampleStartIndex;
 
 
 

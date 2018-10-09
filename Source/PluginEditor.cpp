@@ -88,5 +88,8 @@ void ClipCapEditor::timerCallback()
 {
 	m_envSlowSlider->setValue(convertMeterScale(processor.getEnvSlow()));
 	m_envFastSlider->setValue(convertMeterScale(processor.getEnvFast()));
-	m_recordSlider->setValue(convertMeterScale(processor.getEnvRecord()));
+	if (processor.getSampleStartIndex() > 0)
+		m_recordSlider->setValue(convertMeterScale(processor.getEnvRecord()));
+	else
+		m_recordSlider->setValue(0.0);
 }

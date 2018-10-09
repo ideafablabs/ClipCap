@@ -104,7 +104,7 @@ void ClipCapAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBloc
 
 	m_sampleRate = sampleRate;
 
-	float recordBufferSeconds = 4.0;
+	float recordBufferSeconds = 3.0;
 	recordBufferFloat.setSize(2, (int)(sampleRate * recordBufferSeconds));
 	reset();
 }
@@ -120,6 +120,11 @@ void ClipCapAudioProcessor::reset()
 	// means there's been a break in the audio's continuity.
 	recordBufferFloat.clear();
 	m_recordIndex = 0;
+	m_sampleStartIndex = -1;
+
+	m_sampleBufferIndex = 0;
+	for (int i = 0; i < NUM_SAMPLE_BUFFERS; i++)
+		m_sampleBuffers[i].setSize(1, 1);
 
 	m_envFast = 0.0;
 	m_envSlow = 0.0;
@@ -188,9 +193,48 @@ void ClipCapAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
 		m_envSlow = (m_envSlow * m_envSlowCoeff) + (rms * (1.0 - m_envSlowCoeff));
 
 		if ((m_envSlow > 0.01) && (m_envFast / m_envSlow > 1.12))
+		{
 			m_envRecord = 1.0;  // recent triggers reset to 1.0
+			if (m_sampleStartIndex == -1)
+			{
+				m_sampleStartIndex = m_recordIndex - (int)(m_sampleRate * 0.25); // set the start position back a bit to be less abrupt
+				                                             //  ^^^  this delay should be something musical, like a quarter note, or a measure.  FIXME 
+				if (m_sampleStartIndex < 0)
+					m_sampleStartIndex += recordBufferFloat.getNumSamples(); // wrap
+			}
+		}
 		else
+		{
 			m_envRecord *= m_envRecordCoeff;  // decay when not triggered
+			if (m_sampleStartIndex > 0)
+			{
+				if (m_envRecord < 0.05 || m_recordIndex == m_sampleStartIndex)
+				{
+					// store the sample
+					uint32 sampleIdx = m_sampleBufferIndex++;
+					if (m_sampleBufferIndex >= NUM_SAMPLE_BUFFERS)
+						m_sampleBufferIndex = 0;
+					int sampleSize = m_recordIndex - m_sampleStartIndex;
+					if (sampleSize < 0)
+						sampleSize += recordBufferFloat.getNumSamples(); // wrap
+					else if (sampleSize == 0)
+						sampleSize = recordBufferFloat.getNumSamples(); // full buffer
+					m_sampleBuffers[sampleIdx].setSize(1, sampleSize);
+
+					if (m_recordIndex > m_sampleStartIndex) // no wrap
+					{
+						m_sampleBuffers[sampleIdx].copyFrom(0, 0, recordBufferFloat.getReadPointer(0, m_recordIndex), sampleSize);
+					}
+					else  // wrap
+					{
+						m_sampleBuffers[sampleIdx].copyFrom(0, 0, recordBufferFloat.getReadPointer(0, m_recordIndex), recordBufferFloat.getNumSamples() - m_sampleStartIndex);
+						m_sampleBuffers[sampleIdx].copyFrom(0, recordBufferFloat.getNumSamples() - m_sampleStartIndex, recordBufferFloat.getReadPointer(0), m_recordIndex);
+					}
+
+					m_sampleStartIndex = -1;
+				}
+			}
+		}
 
 		if (++m_recordIndex > recordBufferFloat.getNumSamples())
 			m_recordIndex = 0;
