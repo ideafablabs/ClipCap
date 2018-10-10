@@ -13,6 +13,36 @@
 #include "../JuceLibraryCode/JuceHeader.h"
 
 
+#define CLIPCAP_BUFFER_SIZE 3.0  // size of the record circular buffer in seconds
+#define NUM_CLIPCAP_VOICES 32  // polyphony
+#define NUM_SAMPLE_BUFFERS 128  // one for each midi note
+#define CLIPCAP_MINIMUM_SAMPLE_TIME 0.2  // minimum sample length in seconds
+#define CLIPCAP_LEVEL_THRESHOLD 0.01  // the slow envelope must be greater than this to trigger
+#define CLIPCAP_TRIGGER_RATIO 1.14  // the ratio of fast envelope to slow to trigger a recording
+#define CLIPCAP_SAMPLE_STOP_THRESHOLD 0.03  // the ratio of fast envelope to slow to end a recording
+
+class ClipCapVoice
+{
+public:
+	ClipCapVoice();
+	~ClipCapVoice();
+
+	// Trigger a new sample
+	void Play(AudioBuffer<float> *sample, int preRoll);
+
+	// Render output to the buffer if a note is playing
+	void Process(AudioBuffer<float> &buffer);
+
+	// True if this voice is playing a sample, false if it's available
+	int IsPlaying(void) { return m_index >= 0; }
+
+protected:
+	AudioBuffer<float> *m_sample;
+	int m_index;
+	int m_preRoll;
+};
+
+
 //==============================================================================
 /**
 */
@@ -63,7 +93,8 @@ public:
 	float getEnvSlow() { return m_envSlow; }
 	float getEnvFast() { return m_envFast; }
 	float getEnvRecord() { return m_envRecord; }
-	int32 getSampleStartIndex() { return m_sampleStartIndex; }
+	int getSampleStartIndex() { return m_sampleStartIndex; }
+	int nextNote();
 
 private:
 
@@ -71,7 +102,6 @@ private:
 	AudioBuffer<float> recordBufferFloat;
 	int m_recordIndex;
 
-#define NUM_SAMPLE_BUFFERS 128
 	AudioBuffer<float> m_sampleBuffers[NUM_SAMPLE_BUFFERS];
 	int m_sampleBufferIndex;
 
@@ -83,6 +113,9 @@ private:
 	float m_envRecord;
 	float m_envRecordCoeff;
 	int m_sampleStartIndex;
+
+
+	ClipCapVoice m_voices[NUM_CLIPCAP_VOICES];
 
 
 

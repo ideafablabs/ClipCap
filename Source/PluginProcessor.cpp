@@ -104,7 +104,7 @@ void ClipCapAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBloc
 
 	m_sampleRate = sampleRate;
 
-	float recordBufferSeconds = 3.0;
+	float recordBufferSeconds = CLIPCAP_BUFFER_SIZE;
 	recordBufferFloat.setSize(2, (int)(sampleRate * recordBufferSeconds));
 	reset();
 }
@@ -170,20 +170,15 @@ void ClipCapAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    // In case we have more outputs than inputs, this code clears any output
-    // channels that didn't contain input data, (because these aren't
-    // guaranteed to be empty - they may contain garbage).
-    // This is here to avoid people getting screaming feedback
-    // when they first compile a plugin, but obviously you don't need to keep
-    // this code if your algorithm always overwrites all the output channels.
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
+	// Only 1 channel here, and will always only be one
+	jassert(totalNumInputChannels == 1 && totalNumOutputChannels == 1);
 
-    // Only 1 channel here, and will always only be one
     auto *channelData = buffer.getWritePointer(0);
 	auto *recordData = recordBufferFloat.getWritePointer(0);
 
-	for (uint32 i = 0; i < buffer.getNumSamples(); i++)
+	// Process the input and save clips to the sample pool
+	int i;
+	for (i = 0; i < buffer.getNumSamples(); i++)
 	{
 		float sample = channelData[i];
 		recordData[m_recordIndex] = sample;
@@ -192,7 +187,7 @@ void ClipCapAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
 		m_envFast = (m_envFast * m_envFastCoeff) + (rms * (1.0 - m_envFastCoeff));
 		m_envSlow = (m_envSlow * m_envSlowCoeff) + (rms * (1.0 - m_envSlowCoeff));
 
-		if ((m_envSlow > 0.01) && (m_envFast / m_envSlow > 1.12))
+		if ((m_envSlow > CLIPCAP_LEVEL_THRESHOLD) && (m_envFast / m_envSlow > CLIPCAP_TRIGGER_RATIO))
 		{
 			m_envRecord = 1.0;  // recent triggers reset to 1.0
 			if (m_sampleStartIndex == -1)
@@ -208,7 +203,7 @@ void ClipCapAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
 			m_envRecord *= m_envRecordCoeff;  // decay when not triggered
 			if (m_sampleStartIndex > 0)
 			{
-				if (m_envRecord < 0.05 || m_recordIndex == m_sampleStartIndex)
+				if (m_envRecord < CLIPCAP_SAMPLE_STOP_THRESHOLD || m_recordIndex == m_sampleStartIndex)
 				{
 					// store the sample
 					uint32 sampleIdx = m_sampleBufferIndex++;
@@ -219,6 +214,7 @@ void ClipCapAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
 						sampleSize += recordBufferFloat.getNumSamples(); // wrap
 					else if (sampleSize == 0)
 						sampleSize = recordBufferFloat.getNumSamples(); // full buffer
+					if (sampleSize >= m_sampleRate * CLIPCAP_MINIMUM_SAMPLE_TIME)
 					m_sampleBuffers[sampleIdx].setSize(1, sampleSize);
 
 					if (m_recordIndex > m_sampleStartIndex) // no wrap
@@ -239,6 +235,28 @@ void ClipCapAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
 		if (++m_recordIndex > recordBufferFloat.getNumSamples())
 			m_recordIndex = 0;
 	}
+
+	// Process the MIDI commands and trigger new samples
+	MidiBuffer::Iterator midiIterator(midiMessages);
+	MidiMessage currentMessage;
+	int samplePosition = -1;
+	while (midiIterator.getNextEvent(currentMessage, samplePosition))
+	{
+		if (currentMessage.isNoteOn())
+		{
+			int note_id = nextNote();
+			if (note_id >= 0)
+			{
+				m_voices[note_id].Play(&m_sampleBuffers[(m_sampleBufferIndex - currentMessage.getNoteNumber() - 1) & 0x7F], samplePosition); // 0x7F to limit to MIDI's 7-bit 0-127 range
+			}
+		}
+	}
+
+	// Render any playing samples to the output
+	buffer.clear();
+	for (i = 0; i < NUM_CLIPCAP_VOICES; i++)
+		m_voices[i].Process(buffer);
+
 }
 
 //==============================================================================
@@ -271,4 +289,49 @@ void ClipCapAudioProcessor::setStateInformation (const void* data, int sizeInByt
 AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new ClipCapAudioProcessor();
+}
+
+int ClipCapAudioProcessor::nextNote()
+{
+	for (int i = 0; i < NUM_CLIPCAP_VOICES; i++)
+	{
+		if (!m_voices[i].IsPlaying())
+			return i;
+	}
+	return -1;
+}
+
+
+
+ClipCapVoice::ClipCapVoice()
+{
+	m_index = -1;
+}
+ClipCapVoice::~ClipCapVoice()
+{
+}
+
+void ClipCapVoice::Play(AudioBuffer<float> *sample, int preRoll)
+{
+	m_sample = sample;
+	m_index = 0;
+	m_preRoll = preRoll;
+}
+
+void ClipCapVoice::Process(AudioBuffer<float> &buffer)
+{
+	if (m_index < 0)
+		return;
+	if (m_preRoll > 0 && m_preRoll > buffer.getNumSamples())
+	{
+		m_preRoll -= buffer.getNumSamples();
+		return;
+	}
+	float *bufferPtr = buffer.getWritePointer(0);
+	const float *sample = m_sample->getReadPointer(0);
+	for (int i = m_preRoll; i < buffer.getNumSamples() && m_index < m_sample->getNumSamples(); i++, m_index++)
+		bufferPtr[i] += sample[m_index];
+	if (m_index >= m_sample->getNumSamples())
+		m_index = -1;  // Done!
+	m_preRoll = 0;
 }
